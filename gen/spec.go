@@ -20,7 +20,7 @@ const (
 
 // Method is a bitfield representing something that the
 // generator knows how to print.
-type Method uint8
+type Method uint16
 
 // are the bits in 'f' set in 'm'?
 func (m Method) isset(f Method) bool { return (m&f == f) }
@@ -38,13 +38,17 @@ func (m Method) String() string {
 		return "marshal"
 	case Unmarshal:
 		return "unmarshal"
+	case MarshalJSON:
+		return "marshalJson"
+	case UnmarshalJSON:
+		return "unmarshalJson"
 	case Size:
 		return "size"
 	case Test:
 		return "test"
 	default:
 		// return e.g. "decode+encode+test"
-		modes := [...]Method{Decode, Encode, Marshal, Unmarshal, Size, Test}
+		modes := [...]Method{Decode, Encode, Marshal, Unmarshal, OmitEmpty, MarshalJSON, UnmarshalJSON, Size, Test}
 		any := false
 		nm := ""
 		for _, mm := range modes {
@@ -72,6 +76,10 @@ func strtoMeth(s string) Method {
 		return Marshal
 	case "unmarshal":
 		return Unmarshal
+	case "marshalJson":
+		return MarshalJSON
+	case "unmarshalJson":
+		return UnmarshalJSON
 	case "size":
 		return Size
 	case "test":
@@ -82,16 +90,19 @@ func strtoMeth(s string) Method {
 }
 
 const (
-	Decode      Method                       = 1 << iota // msgp.Decodable
-	Encode                                               // msgp.Encodable
-	Marshal                                              // msgp.Marshaler
-	Unmarshal                                            // msgp.Unmarshaler
-	Size                                                 // msgp.Sizer
-	OmitEmpty                                            // msgp.OmitEmptyAware
-	Test                                                 // generate tests
-	invalidmeth                                          // this isn't a method
-	encodetest  = Encode | Decode | Test                 // tests for Encodable and Decodable
-	marshaltest = Marshal | Unmarshal | Test             // tests for Marshaler and Unmarshaler
+	Decode        Method = 1 << iota                   // msgp.Decodable
+	Encode                                             // msgp.Encodable
+	Marshal                                            // msgp.Marshaler
+	Unmarshal                                          // msgp.Unmarshaler
+	MarshalJSON                                        // json.Marshaler
+	UnmarshalJSON                                      // json.Unmarshaler
+	Size                                               // msgp.Sizer
+	OmitEmpty                                          // msgp.OmitEmptyAware
+	Test                                               // generate tests
+	invalidmeth                                        // this isn't a method
+	encodetest    = Encode | Decode | Test             // tests for Encodable and Decodable
+	marshaltest   = Marshal | Unmarshal | Test         // tests for Marshaler and Unmarshaler
+	jsontest      = MarshalJSON /*| UnmarshalJSON*/ | Test // tests for Marshaler and Unmarshaler
 )
 
 type Printer struct {
@@ -120,6 +131,15 @@ func NewPrinter(m Method, out io.Writer, tests io.Writer) *Printer {
 	}
 	if m.isset(OmitEmpty) {
 		gens = append(gens, omitempies(out))
+	}
+	if m.isset(MarshalJSON) {
+		gens = append(gens, marshalJSON(out))
+	}
+	if m.isset(UnmarshalJSON) {
+		gens = append(gens, unmarshalJSON(out))
+	}
+	if m.isset(jsontest) {
+		gens = append(gens, jtest(tests))
 	}
 	if m.isset(marshaltest) {
 		gens = append(gens, mtest(tests))
@@ -240,12 +260,12 @@ func imutMethodReceiver(p Elem) string {
 	nope:
 		return "*" + p.TypeName()
 
-	// gets dereferenced automatically
+		// gets dereferenced automatically
 	case *Array:
 		return "*" + p.TypeName()
 
-	// everything else can be
-	// by-value.
+		// everything else can be
+		// by-value.
 	default:
 		return p.TypeName()
 	}
@@ -262,8 +282,8 @@ func methodReceiver(p Elem) string {
 	// so no need to alter varname
 	case *Struct, *Array:
 		return "*" + p.TypeName()
-	// set variable name to
-	// *varname
+		// set variable name to
+		// *varname
 	default:
 		p.SetVarname("(*" + p.Varname() + ")")
 		return "*" + p.TypeName()

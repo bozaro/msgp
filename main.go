@@ -41,6 +41,7 @@ var (
 	encode     = flag.Bool("io", true, "create Encode and Decode methods")
 	marshal    = flag.Bool("marshal", true, "create Marshal and Unmarshal methods")
 	omitempty  = flag.Bool("omitempty", true, "create ShouldOmitAsEmpty methods")
+	json       = flag.Bool("json", false, "create MarshalJSON/UnmarshalJSON methods")
 	tests      = flag.Bool("tests", true, "create tests and benchmarks")
 	unexported = flag.Bool("unexported", false, "also process unexported types")
 )
@@ -67,6 +68,9 @@ func main() {
 	if *omitempty {
 		mode |= (gen.OmitEmpty)
 	}
+	if *json {
+		mode |= (gen.MarshalJSON /*| gen.UnmarshalJSON*/)
+	}
 	if *tests {
 		mode |= gen.Test
 	}
@@ -92,7 +96,7 @@ func Run(gofile string, mode gen.Method, unexported bool) error {
 	}
 	fmt.Println(chalk.Magenta.Color("======== MessagePack Code Generator ======="))
 	fmt.Printf(chalk.Magenta.Color(">>> Input: \"%s\"\n"), gofile)
-	fs, err := parse.File(gofile, unexported)
+	fs, err := parse.File(gofile, unexported, "msg")
 	if err != nil {
 		return err
 	}

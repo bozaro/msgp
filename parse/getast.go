@@ -22,6 +22,7 @@ type FileSet struct {
 	Identities map[string]gen.Elem // processed from specs
 	Directives []string            // raw preprocessor directives
 	Imports    []*ast.ImportSpec   // imports
+	Tags       []string            // scanned tag names
 }
 
 // File parses a file at the relative path
@@ -30,12 +31,13 @@ type FileSet struct {
 // directory will be parsed.
 // If unexport is false, only exported identifiers are included in the FileSet.
 // If the resulting FileSet would be empty, an error is returned.
-func File(name string, unexported bool) (*FileSet, error) {
+func File(name string, unexported bool, tags ...string) (*FileSet, error) {
 	pushstate(name)
 	defer popstate()
 	fs := &FileSet{
 		Specs:      make(map[string]ast.Expr),
 		Identities: make(map[string]gen.Elem),
+		Tags:       tags,
 	}
 
 	fset := token.NewFileSet()
@@ -340,7 +342,13 @@ func (fs *FileSet) getField(f *ast.Field) []gen.StructField {
 	var omitEmpty bool
 	// parse tag; otherwise field name is field tag
 	if f.Tag != nil {
-		body := reflect.StructTag(strings.Trim(f.Tag.Value, "`")).Get("msg")
+		body := ""
+		for _, tag := range fs.Tags {
+			if value, ok := reflect.StructTag(strings.Trim(f.Tag.Value, "`")).Lookup(tag); ok {
+				body = value
+				break
+			}
+		}
 		tags := strings.Split(body, ",")
 		if len(tags) > 1 {
 			for _, tag := range tags {

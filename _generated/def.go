@@ -7,7 +7,7 @@ import (
 	"github.com/tinylib/msgp/msgp"
 )
 
-//go:generate msgp -o generated.go
+//go:generate msgp -o generated.go -json=true
 
 // All of the struct
 // definitions in this
@@ -42,7 +42,8 @@ type Fixed struct {
 type TestType struct {
 	F   *float64          `msg:"float"`
 	Els map[string]string `msg:"elements"`
-	Obj struct {          // test anonymous struct
+	Obj struct {
+		// test anonymous struct
 		ValueA string `msg:"value_a"`
 		ValueB []byte `msg:"value_b"`
 	} `msg:"object"`
@@ -64,7 +65,8 @@ type TestType struct {
 type TestOmit struct {
 	F   *float64          `msg:"float,omitempty"`
 	Els map[string]string `msg:"elements,omitempty"`
-	Obj struct {          // test anonymous struct
+	Obj struct {
+		// test anonymous struct
 		ValueA string `msg:"value_a,omitempty"`
 		ValueB []byte `msg:"value_b,omitempty"`
 	} `msg:"object,omitempty"`
@@ -239,6 +241,7 @@ type CustomOmit struct {
 	Mp    map[string]*Embedded `msg:"mp,omitempty"`
 	Enums []MyEnum             `msg:"enums,omitempty"` // test explicit enum shim
 	Some  FileHandle           `msg:file_handle,omitempty`
+	Foo   Embedded             `msg:"foo,omitempty"`
 }
 
 type Files []*os.File
