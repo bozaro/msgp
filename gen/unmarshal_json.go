@@ -2,7 +2,6 @@ package gen
 
 import (
 	"io"
-	"strconv"
 )
 
 func unmarshalJSON(w io.Writer) *unmarshalJSONGen {
@@ -23,7 +22,7 @@ func (u *unmarshalJSONGen) needsField() {
 	if u.hasfield {
 		return
 	}
-	u.p.print("\nvar field []byte; _ = field")
+	u.p.print("\nvar field string; _ = field")
 	u.hasfield = true
 }
 
@@ -40,12 +39,31 @@ func (u *unmarshalJSONGen) Execute(p Elem) error {
 		return nil
 	}
 
-	u.p.comment("unmarshalJSONMsg implements msgp.unmarshalJSONer")
+	u.p.comment("UnmarshalJSON implements json.Unmarshaler")
+	selfvar := p.Varname()
+	receiver := methodReceiver(p)
+	u.p.printf("\nfunc (%s %s) UnmarshalJSON(bts []byte) (err error) {", selfvar, receiver)
+	u.p.print("\nl := jlexer.Lexer{Data: bts}")
+	u.p.printf("\n%s.UnmarshalEasyJSON(&l)", p.Varname())
+	u.p.print("\nreturn l.Error()")
+	u.p.closeblock()
 
-	u.p.printf("\nfunc (%s %s) unmarshalJSONMsg(bts []byte) (o []byte, err error) {", p.Varname(), methodReceiver(p))
+	u.p.printf("\nfunc (%s %s) UnmarshalEasyJSON(l *jlexer.Lexer) {", selfvar, receiver)
+	/*u.p.print("\n isTopLevel := l.IsStart()")
+	u.p.print("\n if l.IsNull() {")
+	u.p.print("\n if isTopLevel {")
+	u.p.print("\n  l.Consumed()")
+	u.p.print("\n }")
+	u.p.print("\n l.Skip()")
+	u.p.print("\n  return")
+	u.p.print("\n }")
+	u.p.print("\n l.Delim('{')")*/
 	next(u, p)
-	u.p.print("\no = bts")
-	u.p.nakedReturn()
+	/*u.p.print("\n l.Delim('}')")
+	u.p.print("\n if isTopLevel {")
+	u.p.print("\n  l.Consumed()")
+	u.p.print("\n }")*/
+	u.p.closeblock()
 	unsetReceiver(p)
 	return u.p.err
 }
@@ -72,30 +90,35 @@ func (u *unmarshalJSONGen) gStruct(s *Struct) {
 }
 
 func (u *unmarshalJSONGen) tuple(s *Struct) {
-
-	// open block
-	sz := randIdent()
-	u.p.declare(sz, u32)
-	u.assignAndCheck(sz, arrayHeader)
-	u.p.arrayCheck(strconv.Itoa(len(s.Fields)), sz)
-	for i := range s.Fields {
-		if !u.p.ok() {
-			return
+	u.p.comment("TODO: tuple")
+	/*
+		// open block
+		sz := randIdent()
+		u.p.declare(sz, u32)
+		u.assignAndCheck(sz, arrayHeader)
+		u.p.arrayCheck(strconv.Itoa(len(s.Fields)), sz)
+		for i := range s.Fields {
+			if !u.p.ok() {
+				return
+			}
+			next(u, s.Fields[i].FieldElem)
 		}
-		next(u, s.Fields[i].FieldElem)
-	}
+	*/
 }
 
 func (u *unmarshalJSONGen) mapstruct(s *Struct) {
 	u.needsField()
-	sz := randIdent()
-	u.p.declare(sz, u32)
-	u.assignAndCheck(sz, mapHeader)
-
-	u.p.printf("\nfor %s > 0 {", sz)
-	u.p.printf("\n%s--; field, bts, err = msgp.ReadMapKeyZC(bts)", sz)
-	u.p.print(errcheck)
-	u.p.print("\nswitch msgp.UnsafeString(field) {")
+	u.p.print("\n l.Delim('{')")
+	u.p.print("\n for !l.IsDelim('}') {")
+	// Read field name
+	u.p.print("\n  field := l.UnsafeString()")
+	u.p.print("\n  l.WantColon()")
+	u.p.print("\n  if l.IsNull() {")
+	u.p.print("\n 	l.Skip()")
+	u.p.print("\n 	l.WantComma()")
+	u.p.print("\n 	continue")
+	u.p.print("\n  }")
+	u.p.print("\n  switch field {")
 	for i := range s.Fields {
 		if !u.p.ok() {
 			return
@@ -103,9 +126,13 @@ func (u *unmarshalJSONGen) mapstruct(s *Struct) {
 		u.p.printf("\ncase \"%s\":", s.Fields[i].FieldTag)
 		next(u, s.Fields[i].FieldElem)
 	}
-	u.p.print("\ndefault:\nbts, err = msgp.Skip(bts)")
-	u.p.print(errcheck)
-	u.p.print("\n}\n}") // close switch and for loop
+	u.p.print("\n   default:")
+	u.p.print("\n    l.SkipRecursive()")
+	u.p.print("\n  }")
+	u.p.print("\n  l.WantComma()")
+	// Close loop
+	u.p.print("\n }")
+	u.p.print("\n l.Delim('}')")
 }
 
 func (u *unmarshalJSONGen) gBase(b *BaseElem) {
@@ -124,15 +151,14 @@ func (u *unmarshalJSONGen) gBase(b *BaseElem) {
 
 	switch b.Value {
 	case Bytes:
-		u.p.printf("\n%s, bts, err = msgp.ReadBytesBytes(bts, %s)", refname, lowered)
-	case Ext:
-		u.p.printf("\nbts, err = msgp.ReadExtensionBytes(bts, %s)", lowered)
+		u.p.printf("\n%s = l.Bytes()", refname)
+	case Intf, Ext:
+		u.p.printf("\nmsgp.Read%sJSON(l, %s)", b.BaseName(), refname)
 	case IDENT:
-		u.p.printf("\nbts, err = %s.unmarshalJSONMsg(bts)", lowered)
+		u.p.printf("\n%s.UnmarshalEasyJSON(l)", lowered)
 	default:
-		u.p.printf("\n%s, bts, err = msgp.Read%sBytes(bts)", refname, b.BaseName())
+		u.p.printf("\n%s = msgp.Read%sJSON(l) // %v", refname, b.BaseName(), b.Value)
 	}
-	u.p.print(errcheck)
 
 	if b.Convert {
 		// close 'tmp' block
@@ -154,51 +180,63 @@ func (u *unmarshalJSONGen) gArray(a *Array) {
 	// special case for [const]byte objects
 	// see decode.go for symmetry
 	if be, ok := a.Els.(*BaseElem); ok && be.Value == Byte {
-		u.p.printf("\nbts, err = msgp.ReadExactBytes(bts, (%s)[:])", a.Varname())
-		u.p.print(errcheck)
+		u.p.printf("\nmsgp.ReadExactBytesJSON(l, (%s)[:])", a.Varname())
 		return
 	}
 
-	sz := randIdent()
-	u.p.declare(sz, u32)
-	u.assignAndCheck(sz, arrayHeader)
-	u.p.arrayCheck(coerceArraySize(a.Size), sz)
-	u.p.rangeBlock(a.Index, a.Varname(), u, a.Els)
+	u.p.print("\n l.Delim('[')")
+	// Read elements
+	u.p.printf("\n for %s := 0; %s < int(%s); %s++ {", a.Index, a.Index, a.Size, a.Index)
+	next(u, a.Els)
+	u.p.print("\n  l.WantComma()")
+	u.p.print("\n }")
+	u.p.print("\n l.Delim(']')")
 }
 
 func (u *unmarshalJSONGen) gSlice(s *Slice) {
 	if !u.p.ok() {
 		return
 	}
-	sz := randIdent()
-	u.p.declare(sz, u32)
-	u.assignAndCheck(sz, arrayHeader)
-	u.p.resizeSlice(sz, s)
-	u.p.rangeBlock(s.Index, s.Varname(), u, s.Els)
+	u.p.print("\n l.Delim('[')")
+	u.p.print("\n if !l.IsDelim(']') {")
+	u.p.printf("\n  %s = make(%s, 0, 4)", s.Varname(), s.TypeName())
+	u.p.print("\n } else {")
+	u.p.printf("\n  %s = %s {}", s.Varname(), s.TypeName())
+	u.p.print("\n }")
+	// Read elements
+	u.p.print("\n for !l.IsDelim(']') {")
+	elem := s.Els.Copy()
+	elem.SetVarname(randIdent())
+	u.p.printf("\n  var %s %s", elem.Varname(), elem.TypeName())
+	next(u, elem)
+	u.p.printf("\n  %s = append(%s, %s)", s.Varname(), s.Varname(), elem.Varname())
+	u.p.print("\n  l.WantComma()")
+	u.p.print("\n }")
+	u.p.print("\n l.Delim(']')")
 }
 
 func (u *unmarshalJSONGen) gMap(m *Map) {
 	if !u.p.ok() {
 		return
 	}
-	sz := randIdent()
-	u.p.declare(sz, u32)
-	u.assignAndCheck(sz, mapHeader)
-
-	// allocate or clear map
-	u.p.resizeMap(sz, m)
-
-	// loop and get key,value
-	u.p.printf("\nfor %s > 0 {", sz)
-	u.p.printf("\nvar %s string; var %s %s; %s--", m.Keyidx, m.Validx, m.Value.TypeName(), sz)
-	u.assignAndCheck(m.Keyidx, stringTyp)
+	u.p.print("\n l.Delim('{')")
+	u.p.print("\n if !l.IsDelim('}') {")
+	u.p.printf("\n  %s = make(%s)", m.Varname(), m.TypeName())
+	u.p.print("\n } else {")
+	u.p.printf("\n  %s = nil", m.Varname())
+	u.p.print("\n }")
+	u.p.print("\n for !l.IsDelim('}') {")
+	// Read field name
+	u.p.printf("\n  %s := l.String()", m.Keyidx)
+	u.p.print("\n  l.WantColon()")
+	u.p.printf("\n  var %s %s", m.Validx, m.Value.TypeName())
 	next(u, m.Value)
 	u.p.mapAssign(m)
-	u.p.closeblock()
+	u.p.print("\n }")
+	u.p.print("\n l.Delim('}')")
 }
-
 func (u *unmarshalJSONGen) gPtr(p *Ptr) {
-	u.p.printf("\nif msgp.IsNil(bts) { bts, err = msgp.ReadNilBytes(bts); if err != nil { return }; %s = nil; } else { ", p.Varname())
+	u.p.printf("\nif l.IsNull() { l.Skip(); %s = nil; } else { ", p.Varname())
 	u.p.initPtr(p)
 	next(u, p.Value)
 	u.p.closeblock()

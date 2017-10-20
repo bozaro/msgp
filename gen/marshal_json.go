@@ -45,7 +45,7 @@ func (m *marshalJSONGen) Execute(p Elem) error {
 	c := p.Varname()
 
 	m.p.printf("\nfunc (%s %s) MarshalJSON() ([]byte, error) {", c, imutMethodReceiver(p))
-	m.p.printf("\n	return %s.MarshalBufferJSON(make([]byte, 0, 1024))", c)
+	m.p.printf("\n	return %s.MarshalBufferJSON(make([]byte, 0, %s.SizeJSON()))", c, c)
 	m.p.closeblock()
 	m.p.printf("\n")
 

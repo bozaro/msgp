@@ -69,7 +69,7 @@ func main() {
 		mode |= (gen.OmitEmpty)
 	}
 	if *json {
-		mode |= (gen.MarshalJSON /*| gen.UnmarshalJSON*/)
+		mode |= (gen.MarshalJSON | gen.UnmarshalJSON)
 	}
 	if *tests {
 		mode |= gen.Test

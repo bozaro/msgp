@@ -8,7 +8,7 @@ import (
 var (
 	marshalTestTempl = template.New("MarshalTest")
 	encodeTestTempl  = template.New("EncodeTest")
-	jsonTestTempl  = template.New("MarshalJsonTest")
+	jsonTestTempl    = template.New("MarshalJsonTest")
 )
 
 // TODO(philhofer):
@@ -216,23 +216,17 @@ func BenchmarkDecode{{.TypeName}}(b *testing.B) {
 		t.Error(err)
 	}
 
-	/*m := v.MsgsizeJSON()
+	m := v.SizeJSON()
 	if len(buf) > m {
-		t.Logf("WARNING: Msgsize() for %v is inaccurate", v)
+		t.Logf("WARNING: SizeJSON() for %v is inaccurate\nJSON [%d -> %d]: %s", v, m, len(buf), string(buf))
 	}
 
 	vn := {{.TypeName}}{}
-	err := msgp.Decode(&buf, &vn)
+	err = vn.UnmarshalJSON(buf)
 	if err != nil {
+		t.Logf("JSON: %s", string(buf))
 		t.Error(err)
 	}
-
-	buf.Reset()
-	msgp.Encode(&buf, &v)
-	err = msgp.NewReader(&buf).Skip()
-	if err != nil {
-		t.Error(err)
-	}*/
 }
 
 func BenchmarkMarshalJSON{{.TypeName}}(b *testing.B) {
@@ -241,30 +235,37 @@ func BenchmarkMarshalJSON{{.TypeName}}(b *testing.B) {
 	if err != nil {
 		b.Error(err)
 	}
+	data := make([]byte, 0, v.SizeJSON())
+
 	b.SetBytes(int64(len(buf)))
 	b.ReportAllocs()
 	b.ResetTimer()
 	for i:=0; i<b.N; i++ {
-		v.MarshalJSON()
+		data = data[:0]
+		_, err = v.MarshalBufferJSON(data)
+		if err != nil {
+			b.Error(err)
+		}
 	}
 }
 
-/*func BenchmarkUnmarshalJSON{{.TypeName}}(b *testing.B) {
+func BenchmarkUnmarshalJSON{{.TypeName}}(b *testing.B) {
 	v := {{.TypeName}}{}
-	var buf bytes.Buffer
-	msgp.Encode(&buf, &v)
-	b.SetBytes(int64(buf.Len()))
-	rd := msgp.NewEndlessReader(buf.Bytes(), b)
-	dc := msgp.NewReader(rd)
+	buf, err := v.MarshalJSON()
+	if err != nil {
+		b.Error(err)
+	}
+	b.SetBytes(int64(len(buf)))
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i:=0; i<b.N; i++ {
-		err := v.DecodeMsg(dc)
-		if  err != nil {
-			b.Fatal(err)
+	for i := 0; i < b.N; i++ {
+		var o {{.TypeName}}
+		err = o.UnmarshalJSON(buf)
+		if err != nil {
+			b.Error(err)
 		}
 	}
-}*/
+}
 
 `))
 }

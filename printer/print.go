@@ -81,6 +81,9 @@ func generate(f *parse.FileSet, mode gen.Method) (*bytes.Buffer, *bytes.Buffer, 
 	writePkgHeader(outbuf, f.Package)
 
 	myImports := []string{"github.com/tinylib/msgp/msgp"}
+	if mode&gen.UnmarshalJSON == gen.UnmarshalJSON {
+		myImports = append(myImports, "github.com/mailru/easyjson/jlexer")
+	}
 	for _, imp := range f.Imports {
 		if imp.Name != nil {
 			// have an alias, include it.

@@ -144,21 +144,6 @@ func (n *Number) DecodeMsg(r *Reader) error {
 	}
 }
 
-func (n *Number) MarshalBufferJSON(b []byte) ( []byte, error) {
-	switch n.typ {
-	case IntType:
-		return AppendInt64JSON(b, int64(n.bits))
-	case UintType:
-		return AppendUint64JSON(b, uint64(n.bits))
-	case Float64Type:
-		return AppendFloat64JSON(b, math.Float64frombits(n.bits))
-	case Float32Type:
-		return AppendFloat32JSON(b, math.Float32frombits(uint32(n.bits)))
-	default:
-		return AppendInt64JSON(b, 0)
-	}
-}
-
 // UnmarshalMsg implements msgp.Unmarshaler
 func (n *Number) UnmarshalMsg(b []byte) ([]byte, error) {
 	typ := NextType(b)

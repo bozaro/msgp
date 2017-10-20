@@ -90,19 +90,19 @@ func strtoMeth(s string) Method {
 }
 
 const (
-	Decode        Method = 1 << iota                   // msgp.Decodable
-	Encode                                             // msgp.Encodable
-	Marshal                                            // msgp.Marshaler
-	Unmarshal                                          // msgp.Unmarshaler
-	MarshalJSON                                        // json.Marshaler
-	UnmarshalJSON                                      // json.Unmarshaler
-	Size                                               // msgp.Sizer
-	OmitEmpty                                          // msgp.OmitEmptyAware
-	Test                                               // generate tests
-	invalidmeth                                        // this isn't a method
-	encodetest    = Encode | Decode | Test             // tests for Encodable and Decodable
-	marshaltest   = Marshal | Unmarshal | Test         // tests for Marshaler and Unmarshaler
-	jsontest      = MarshalJSON /*| UnmarshalJSON*/ | Test // tests for Marshaler and Unmarshaler
+	Decode        Method                               = 1 << iota // msgp.Decodable
+	Encode                                                         // msgp.Encodable
+	Marshal                                                        // msgp.Marshaler
+	Unmarshal                                                      // msgp.Unmarshaler
+	MarshalJSON                                                    // json.Marshaler
+	UnmarshalJSON                                                  // json.Unmarshaler
+	Size                                                           // msgp.Sizer
+	OmitEmpty                                                      // msgp.OmitEmptyAware
+	Test                                                           // generate tests
+	invalidmeth                                                    // this isn't a method
+	encodetest    = Encode | Decode | Test                         // tests for Encodable and Decodable
+	marshaltest   = Marshal | Unmarshal | Test                     // tests for Marshaler and Unmarshaler
+	jsontest      = MarshalJSON | UnmarshalJSON | Test             // tests for Marshaler and Unmarshaler
 )
 
 type Printer struct {
@@ -134,6 +134,7 @@ func NewPrinter(m Method, out io.Writer, tests io.Writer) *Printer {
 	}
 	if m.isset(MarshalJSON) {
 		gens = append(gens, marshalJSON(out))
+		gens = append(gens, sizesJSON(out))
 	}
 	if m.isset(UnmarshalJSON) {
 		gens = append(gens, unmarshalJSON(out))
