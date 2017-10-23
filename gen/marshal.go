@@ -19,6 +19,18 @@ type marshalGen struct {
 	fuse []byte
 }
 
+func (m *marshalGen) Tags() []string {
+	return msgTags
+}
+
+func (m *marshalGen) IsTests() bool {
+	return false
+}
+
+func (m *marshalGen) Imports() []string {
+	return []string{}
+}
+
 func (m *marshalGen) Method() Method { return Marshal }
 
 func (m *marshalGen) Apply(dirs []string) error {

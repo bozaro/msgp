@@ -21,6 +21,18 @@ type sizeJSONGen struct {
 	state sizeState
 }
 
+func (e *sizeJSONGen) Tags() []string {
+	return jsonTags
+}
+
+func (s *sizeJSONGen) IsTests() bool {
+	return false
+}
+
+func (s *sizeJSONGen) Imports() []string {
+	return []string{}
+}
+
 func (s *sizeJSONGen) Method() Method { return Size }
 
 func (s *sizeJSONGen) Apply(dirs []string) error {

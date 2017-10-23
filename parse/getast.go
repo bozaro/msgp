@@ -7,11 +7,11 @@ import (
 	"go/token"
 	"os"
 	"reflect"
-	"sort"
 	"strings"
 
 	"github.com/tinylib/msgp/gen"
 	"github.com/ttacon/chalk"
+	"sort"
 )
 
 // A FileSet is the in-memory representation of a
@@ -217,7 +217,7 @@ func strToMethod(s string) gen.Method {
 	}
 }
 
-func (f *FileSet) applyDirs(p *gen.Printer) {
+func (f *FileSet) applyDirs(g gen.Generator) {
 	// apply directives of the form
 	//
 	// 	//msgp:encode ignore {{TypeName}}
@@ -236,7 +236,7 @@ loop:
 			}
 			if fn, ok := passDirectives[chunks[1]]; ok {
 				pushstate(chunks[1])
-				err := fn(m, chunks[2:], p)
+				err := fn(m, chunks[2:], g)
 				if err != nil {
 					warnf("error applying directive: %s\n", err)
 				}
@@ -250,8 +250,8 @@ loop:
 	}
 }
 
-func (f *FileSet) PrintTo(p *gen.Printer) error {
-	f.applyDirs(p)
+func (f *FileSet) PrintTo(g gen.Generator) error {
+	f.applyDirs(g)
 	names := make([]string, 0, len(f.Identities))
 	for name := range f.Identities {
 		names = append(names, name)
@@ -261,7 +261,7 @@ func (f *FileSet) PrintTo(p *gen.Printer) error {
 		el := f.Identities[name]
 		el.SetVarname("z")
 		pushstate(el.TypeName())
-		err := p.Print(el)
+		err := g.Execute(el)
 		popstate()
 		if err != nil {
 			return err
@@ -293,10 +293,10 @@ func (fs *FileSet) getTypeSpecs(f *ast.File) {
 					// this is the list of parse-able
 					// type specs
 					case *ast.StructType,
-						*ast.ArrayType,
-						*ast.StarExpr,
-						*ast.MapType,
-						*ast.Ident:
+					*ast.ArrayType,
+					*ast.StarExpr,
+					*ast.MapType,
+					*ast.Ident:
 						fs.Specs[ts.Name.Name] = ts.Type
 
 					}

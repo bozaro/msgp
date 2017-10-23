@@ -19,6 +19,18 @@ type marshalJSONGen struct {
 	fuse []byte
 }
 
+func (m *marshalJSONGen) Tags() []string {
+	return jsonTags
+}
+
+func (m *marshalJSONGen) IsTests() bool {
+	return false
+}
+
+func (m *marshalJSONGen) Imports() []string {
+	return []string{}
+}
+
 func (m *marshalJSONGen) Method() Method { return MarshalJSON }
 
 func (m *marshalJSONGen) Apply(dirs []string) error {

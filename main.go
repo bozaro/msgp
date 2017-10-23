@@ -96,21 +96,21 @@ func Run(gofile string, mode gen.Method, unexported bool) error {
 	}
 	fmt.Println(chalk.Magenta.Color("======== MessagePack Code Generator ======="))
 	fmt.Printf(chalk.Magenta.Color(">>> Input: \"%s\"\n"), gofile)
-	fs, err := parse.File(gofile, unexported, "msg")
-	if err != nil {
-		return err
+	r := func(tags []string) (*parse.FileSet, error) {
+		f, err := parse.File(gofile, unexported, tags...)
+		if err != nil {
+			return nil, err
+		}
+		if len(f.Identities) == 0 {
+			fmt.Println(chalk.Magenta.Color("No types requiring code generation were found!"))
+		}
+		return f, err
 	}
-
-	if len(fs.Identities) == 0 {
-		fmt.Println(chalk.Magenta.Color("No types requiring code generation were found!"))
-		return nil
-	}
-
-	return printer.PrintFile(newFilename(gofile, fs.Package), fs, mode)
+	return printer.PrintFile(newFilename(gofile), r, mode)
 }
 
 // picks a new file name based on input flags and input filename(s).
-func newFilename(old string, pkg string) string {
+func newFilename(old string) string {
 	if *out != "" {
 		if pre := strings.TrimPrefix(*out, old); len(pre) > 0 &&
 			!strings.HasSuffix(*out, ".go") {
@@ -120,7 +120,7 @@ func newFilename(old string, pkg string) string {
 	}
 
 	if fi, err := os.Stat(old); err == nil && fi.IsDir() {
-		old = filepath.Join(old, pkg)
+		old = filepath.Join(old, printer.PackagePlaceholder)
 	}
 	// new file name is old file name + _gen.go
 	return strings.TrimSuffix(old, ".go") + "_gen.go"

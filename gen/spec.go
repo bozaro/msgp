@@ -18,6 +18,11 @@ const (
 	u32         = "uint32"
 )
 
+var (
+	msgTags  = []string{"msg"}
+	jsonTags = []string{"json", "msg"}
+)
+
 // Method is a bitfield representing something that the
 // generator knows how to print.
 type Method uint16
@@ -90,30 +95,30 @@ func strtoMeth(s string) Method {
 }
 
 const (
-	Decode        Method                               = 1 << iota // msgp.Decodable
-	Encode                                                         // msgp.Encodable
-	Marshal                                                        // msgp.Marshaler
-	Unmarshal                                                      // msgp.Unmarshaler
-	MarshalJSON                                                    // json.Marshaler
-	UnmarshalJSON                                                  // json.Unmarshaler
-	Size                                                           // msgp.Sizer
-	OmitEmpty                                                      // msgp.OmitEmptyAware
-	Test                                                           // generate tests
-	invalidmeth                                                    // this isn't a method
-	encodetest    = Encode | Decode | Test                         // tests for Encodable and Decodable
-	marshaltest   = Marshal | Unmarshal | Test                     // tests for Marshaler and Unmarshaler
-	jsontest      = MarshalJSON | UnmarshalJSON | Test             // tests for Marshaler and Unmarshaler
+	Decode        Method = 1 << iota                   // msgp.Decodable
+	Encode                                             // msgp.Encodable
+	Marshal                                            // msgp.Marshaler
+	Unmarshal                                          // msgp.Unmarshaler
+	MarshalJSON                                        // json.Marshaler
+	UnmarshalJSON                                      // json.Unmarshaler
+	Size                                               // msgp.Sizer
+	OmitEmpty                                          // msgp.OmitEmptyAware
+	Test                                               // generate tests
+	invalidmeth                                        // this isn't a method
+	encodetest    = Encode | Decode | Test             // tests for Encodable and Decodable
+	marshaltest   = Marshal | Unmarshal | Test         // tests for Marshaler and Unmarshaler
+	jsontest      = MarshalJSON | UnmarshalJSON | Test // tests for Marshaler and Unmarshaler
 )
 
 type Printer struct {
-	gens []generator
+	Gens []Generator
 }
 
 func NewPrinter(m Method, out io.Writer, tests io.Writer) *Printer {
 	if m.isset(Test) && tests == nil {
 		panic("cannot print tests with 'nil' tests argument!")
 	}
-	gens := make([]generator, 0, 7)
+	gens := make([]Generator, 0, 15)
 	if m.isset(Decode) {
 		gens = append(gens, decode(out))
 	}
@@ -151,7 +156,7 @@ func NewPrinter(m Method, out io.Writer, tests io.Writer) *Printer {
 	if len(gens) == 0 {
 		panic("NewPrinter called with invalid method flags")
 	}
-	return &Printer{gens: gens}
+	return &Printer{Gens: gens}
 }
 
 // TransformPass is a pass that transforms individual
@@ -172,17 +177,15 @@ func IgnoreTypename(name string) TransformPass {
 
 // ApplyDirective applies a directive to a named pass
 // and all of its dependents.
-func (p *Printer) ApplyDirective(pass Method, t TransformPass) {
-	for _, g := range p.gens {
-		if g.Method().isset(pass) {
-			g.Add(t)
-		}
+func ApplyDirective(g Generator, pass Method, t TransformPass) {
+	if g.Method().isset(pass) {
+		g.Add(t)
 	}
 }
 
 // Print prints an Elem.
 func (p *Printer) Print(e Elem) error {
-	for _, g := range p.gens {
+	for _, g := range p.Gens {
 		err := g.Execute(e)
 		if err != nil {
 			return err
@@ -193,7 +196,10 @@ func (p *Printer) Print(e Elem) error {
 
 // generator is the interface through
 // which code is generated.
-type generator interface {
+type Generator interface {
+	Tags() []string    // scanned metadata tags.
+	IsTests() bool     // test generator marker.
+	Imports() []string // imports.
 	Method() Method
 	Add(p TransformPass)
 	Execute(Elem) error // execute writes the method for the provided object.

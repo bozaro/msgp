@@ -16,6 +16,20 @@ type unmarshalJSONGen struct {
 	hasfield bool
 }
 
+func (e *unmarshalJSONGen) Tags() []string {
+	return jsonTags
+}
+
+func (e *unmarshalJSONGen) IsTests() bool {
+	return false
+}
+
+func (e *unmarshalJSONGen) Imports() []string {
+	return []string{
+		"github.com/mailru/easyjson/jlexer",
+	}
+}
+
 func (u *unmarshalJSONGen) Method() Method { return UnmarshalJSON }
 
 func (u *unmarshalJSONGen) needsField() {

@@ -27,6 +27,18 @@ type mtestGen struct {
 	w io.Writer
 }
 
+func (m *mtestGen) Tags() []string {
+	return msgTags
+}
+
+func (m *mtestGen) IsTests() bool {
+	return true
+}
+
+func (m *mtestGen) Imports() []string {
+	return []string{}
+}
+
 func (m *mtestGen) Execute(p Elem) error {
 	p = m.applyall(p)
 	if p != nil && IsPrintable(p) {
@@ -60,6 +72,20 @@ func (e *etestGen) Execute(p Elem) error {
 	return nil
 }
 
+func (s *etestGen) Tags() []string {
+	return msgTags
+}
+
+func (e *etestGen) IsTests() bool {
+	return true
+}
+
+func (e *etestGen) Imports() []string {
+	return []string{
+		"bytes",
+	}
+}
+
 func (e *etestGen) Method() Method { return encodetest }
 
 type jtestGen struct {
@@ -80,6 +106,18 @@ func (e *jtestGen) Execute(p Elem) error {
 		}
 	}
 	return nil
+}
+
+func (e *jtestGen) Tags() []string {
+	return jsonTags
+}
+
+func (e *jtestGen) IsTests() bool {
+	return true
+}
+
+func (e *jtestGen) Imports() []string {
+	return []string{}
 }
 
 func (e *jtestGen) Method() Method { return jsontest }

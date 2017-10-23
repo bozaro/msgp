@@ -19,6 +19,18 @@ type encodeGen struct {
 	fuse []byte
 }
 
+func (e *encodeGen) Tags() []string {
+	return msgTags
+}
+
+func (e *encodeGen) IsTests() bool {
+	return false
+}
+
+func (e *encodeGen) Imports() []string {
+	return []string{}
+}
+
 func (e *encodeGen) Method() Method { return Encode }
 
 func (e *encodeGen) Apply(dirs []string) error {

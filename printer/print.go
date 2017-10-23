@@ -7,10 +7,15 @@ import (
 	"github.com/tinylib/msgp/parse"
 	"github.com/ttacon/chalk"
 	"golang.org/x/tools/imports"
-	"io"
 	"io/ioutil"
 	"strings"
 )
+
+const (
+	PackagePlaceholder = "${package}"
+)
+
+type FileSetResolver func([]string) (*parse.FileSet, error)
 
 func infof(s string, v ...interface{}) {
 	fmt.Printf(chalk.Magenta.Color(s), v...)
@@ -19,8 +24,8 @@ func infof(s string, v ...interface{}) {
 // PrintFile prints the methods for the provided list
 // of elements to the given file name and canonical
 // package path.
-func PrintFile(file string, f *parse.FileSet, mode gen.Method) error {
-	out, tests, err := generate(f, mode)
+func PrintFile(file string, r FileSetResolver, mode gen.Method) error {
+	out, tests, packageName, err := generate(r, mode)
 	if err != nil {
 		return err
 	}
@@ -31,8 +36,9 @@ func PrintFile(file string, f *parse.FileSet, mode gen.Method) error {
 	// takes about the same amount of time as
 	// doing them in serial when GOMAXPROCS=1,
 	// and faster otherwise.
+	file = strings.Replace(file, PackagePlaceholder, packageName, -1)
 	res := goformat(file, out.Bytes())
-	if tests != nil {
+	if tests.Len() > 0 {
 		testfile := strings.TrimSuffix(file, ".go") + "_test.go"
 		err = format(testfile, tests.Bytes())
 		if err != nil {
@@ -76,38 +82,75 @@ func dedupImports(imp []string) []string {
 	return r
 }
 
-func generate(f *parse.FileSet, mode gen.Method) (*bytes.Buffer, *bytes.Buffer, error) {
+func generate(r FileSetResolver, mode gen.Method) (*bytes.Buffer, *bytes.Buffer, string, error) {
 	outbuf := bytes.NewBuffer(make([]byte, 0, 4096))
-	writePkgHeader(outbuf, f.Package)
+	testbuf := bytes.NewBuffer(make([]byte, 0, 4096))
+	p := gen.NewPrinter(mode, outbuf, testbuf)
 
-	myImports := []string{"github.com/tinylib/msgp/msgp"}
-	if mode&gen.UnmarshalJSON == gen.UnmarshalJSON {
-		myImports = append(myImports, "github.com/mailru/easyjson/jlexer")
-	}
-	for _, imp := range f.Imports {
-		if imp.Name != nil {
-			// have an alias, include it.
-			myImports = append(myImports, imp.Name.Name+` `+imp.Path.Value)
-		} else {
-			myImports = append(myImports, imp.Path.Value)
+	cache := map[string]*parse.FileSet{}
+	key := func(tags []string) string { return strings.Join(tags, ",") }
+	packageName := ""
+	// Parse metadata
+	for _, g := range p.Gens {
+		tags := g.Tags()
+		k := key(tags)
+		if _, ok := cache[k]; !ok {
+			f, err := r(g.Tags())
+			if err != nil {
+				return nil, nil, "", err
+			}
+			cache[k] = f
+			packageName = f.Package
 		}
 	}
-	dedup := dedupImports(myImports)
-	writeImportHeader(outbuf, dedup...)
-
-	var testbuf *bytes.Buffer
-	var testwr io.Writer
-	if mode&gen.Test == gen.Test {
-		testbuf = bytes.NewBuffer(make([]byte, 0, 4096))
-		writePkgHeader(testbuf, f.Package)
-		if mode&(gen.Encode|gen.Decode) != 0 {
-			writeImportHeader(testbuf, "bytes", "github.com/tinylib/msgp/msgp", "testing")
-		} else {
-			writeImportHeader(testbuf, "github.com/tinylib/msgp/msgp", "testing")
+	// Collect all imports
+	importsGen := []string{}
+	importsTest := []string{}
+	for _, g := range p.Gens {
+		f := cache[key(g.Tags())]
+		if len(f.Identities) == 0 {
+			continue
 		}
-		testwr = testbuf
+		addImports := g.Imports()
+		if g.IsTests() {
+			importsTest = append(importsTest, "github.com/tinylib/msgp/msgp", "testing")
+			importsTest = append(importsTest, addImports...)
+		} else {
+			importsGen = append(importsGen, "github.com/tinylib/msgp/msgp")
+			importsGen = append(importsGen, addImports...)
+		}
+		for _, imp := range f.Imports {
+			if imp.Name != nil {
+				// have an alias, include it.
+				importsGen = append(importsGen, imp.Name.Name+` `+imp.Path.Value)
+			} else {
+				importsGen = append(importsGen, imp.Path.Value)
+			}
+		}
+
 	}
-	return outbuf, testbuf, f.PrintTo(gen.NewPrinter(mode, outbuf, testwr))
+	// Write generator imports
+	if len(importsGen) == 0 {
+		return outbuf, testbuf, "", nil
+	}
+	writePkgHeader(outbuf, packageName)
+	writeImportHeader(outbuf, dedupImports(importsGen)...)
+	if len(importsTest) > 0 {
+		writePkgHeader(testbuf, packageName)
+		writeImportHeader(testbuf, dedupImports(importsTest)...)
+	}
+	// Generate code
+	for _, g := range p.Gens {
+		f := cache[key(g.Tags())]
+		if len(f.Identities) == 0 {
+			continue
+		}
+		err := f.PrintTo(g)
+		if err != nil {
+			return nil, nil, "", err
+		}
+	}
+	return outbuf, testbuf, packageName, nil
 }
 
 func writePkgHeader(b *bytes.Buffer, name string) {

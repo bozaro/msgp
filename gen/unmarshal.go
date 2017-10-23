@@ -17,6 +17,18 @@ type unmarshalGen struct {
 	hasfield bool
 }
 
+func (u *unmarshalGen) Tags() []string {
+	return msgTags
+}
+
+func (u *unmarshalGen) IsTests() bool {
+	return false
+}
+
+func (u *unmarshalGen) Imports() []string {
+	return []string{}
+}
+
 func (u *unmarshalGen) Method() Method { return Unmarshal }
 
 func (u *unmarshalGen) needsField() {

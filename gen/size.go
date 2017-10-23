@@ -34,6 +34,18 @@ type sizeGen struct {
 	state sizeState
 }
 
+func (s *sizeGen) Tags() []string {
+	return msgTags
+}
+
+func (s *sizeGen) IsTests() bool {
+	return false
+}
+
+func (s *sizeGen) Imports() []string {
+	return []string{}
+}
+
 func (s *sizeGen) Method() Method { return Size }
 
 func (s *sizeGen) Apply(dirs []string) error {

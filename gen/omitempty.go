@@ -17,6 +17,18 @@ type omitemptyGen struct {
 	expr string
 }
 
+func (s *omitemptyGen) Tags() []string {
+	return msgTags
+}
+
+func (s *omitemptyGen) IsTests() bool {
+	return false
+}
+
+func (s *omitemptyGen) Imports() []string {
+	return []string{}
+}
+
 func (s *omitemptyGen) Method() Method { return Size }
 
 func (s *omitemptyGen) Apply(dirs []string) error {

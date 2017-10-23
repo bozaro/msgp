@@ -18,6 +18,18 @@ type decodeGen struct {
 	hasfield bool
 }
 
+func (d *decodeGen) Tags() []string {
+	return msgTags
+}
+
+func (d *decodeGen) IsTests() bool {
+	return false
+}
+
+func (d *decodeGen) Imports() []string {
+	return []string{}
+}
+
 func (d *decodeGen) Method() Method { return Decode }
 
 func (d *decodeGen) needsField() {
